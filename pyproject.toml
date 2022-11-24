@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "physics"
+version = "0.1.0"
+description = "A collection of scripts exploring different kinds of physics."
+authors = ["Guy Paterson-Jones <guy.paterson.jones@gmail.com>"]
+license = "MIT"
+packages = [{ include = "src" }]
+
+[tool.poetry.scripts]
+main = "src.main:main"
+tf = "src.tensorflow:main"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.11"
+scipy = "^1.9.3"
+numpy = "^1.23.4"
+matplotlib = "^3.6.2"
+tensorflow = "^2.11.0"
+findiff = "^0.9.2"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
