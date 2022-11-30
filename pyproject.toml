@@ -11,6 +11,7 @@ main = "src.scripts.main:main"
 tf = "src.scripts.tensorflow:main"
 free = "src.scripts.free:main"
 take12 = "src.scripts.take12:main"
+take13 = "src.scripts.take13:main"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"

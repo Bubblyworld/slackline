@@ -2,8 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sympy as sp
 
-# Use unicode to print sympy equations:
-sp.init_printing(use_unicode=True)
+sp.init_printing()
 
 # Constants:
 dx = 0.1 # m (step size)
@@ -50,7 +49,7 @@ def model_diagnostics():
     # The potential energy due to the tension in the rope is:
     #   dU_T = [ K/2*(2 - n_x)*(1 + y_x^2) - K/2*y_x^2 + K/2*n_x ] dx
     # ...where we denote the derivative of y with respect to x by y_x.
-    U_T = K/2*(1/n.diff(x))*(1 + y.diff(x)**2) - K/2*y.diff(x)**2 + K/2*n.diff(x)
+    U_T = K/2*(2 - n.diff(x))*(1 + y.diff(x)**2) - K/2*y.diff(x)**2 + K/2*n.diff(x)
     print()
     print("   ...potential energy due to tension in the rope is given by:")
     print(U_T)
