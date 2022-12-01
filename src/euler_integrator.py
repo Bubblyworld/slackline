@@ -59,7 +59,9 @@ def integrate(lagrangian):
     _g = sp.Symbol("g")
     _K = sp.Symbol("K")
     _L = lagrangian(_x, _y, _n, _g, _m, _K)
+    print("LAGRANGIAN:")
     sp.pprint(_L)
+    print()
 
     # The Euler-Lagrange equations can be computed using sympy:
     els = sp.calculus.euler.euler_equations(_L, [_y, _n], [_x])
@@ -75,14 +77,9 @@ def integrate(lagrangian):
     _y_xx = sp.simplify(_y_xx)
     _n_xx = sp.simplify(_n_xx)
 
-    # Print them out:
-    print("EULER-LAGRANGE EQUATIONS:")
-    print("y_xx =")
-    sp.pprint(_y_xx)
-    print()
-    print("n_xx =")
-    sp.pprint(_n_xx)
-    print()
+    # Now we can actually lambidify the functions for fast eval:
+    _y_xx = sp.lambdify([_x, _y, _n, _y.diff(_x), _n.diff(_x)], _y_xx)
+    _n_xx = sp.lambdify([_x, _y, _n, _y.diff(_x), _n.diff(_x)], _n_xx)
 
     # Initialise the numerical variables and functions using numpy arrays:
     x = np.array([0.0])
@@ -105,17 +102,8 @@ def integrate(lagrangian):
     i=0
     while y[-1] <= 0: # don't run forever
         # We can get y_xx and n_xx from the Euler-Lagrange equations:
-        subs = {
-            _y.diff(_x): y_x[i],
-            _n.diff(_x): n_x[i],
-            _y: y[i],
-            _n: n[i],
-            _x: x[i],
-        }
-        y_xx = _y_xx.subs(subs)
-        n_xx = _n_xx.subs(subs)
-        y_xx = sp.lambdify((), y_xx)()
-        n_xx = sp.lambdify((), n_xx)()
+        y_xx = _y_xx(x[i], y[i], n[i], y_x[i], n_x[i])
+        n_xx = _n_xx(x[i], y[i], n[i], y_x[i], n_x[i])
 
         # We can then integrate everything directly:
         y_x = np.append(y_x, y_x[i] + y_xx*dx)
@@ -126,11 +114,12 @@ def integrate(lagrangian):
         i += 1
 
         # Spit something out so we know it's still working:
-        if i % 1000 == 0:
-            print("step {:5d}: x = {:10.5f}, y = {:10.5f}, n = {:10.5f}".format(
+        if i % 200 == 0:
+            print("  ({:5d}): x = {:10.5f}, y = {:10.5f}, n = {:10.5f}".format(
                 i, x[i], y[i], n[i]))
     print("Integration complete after {} steps.".format(i))
     print("DONE.")
+    print("--------------------------")
 
     # Compute arclength and tension:
     l = np.cumsum(np.sqrt(1 + y_x**2))*dx

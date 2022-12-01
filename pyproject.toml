@@ -7,7 +7,10 @@ license = "MIT"
 packages = [{ include = "src" }]
 
 [tool.poetry.scripts]
-massless = "src.massless_integrator:main"
+rk = "src.runge_kutta_integrator:main"
+bc = "src.boundary_condition_integrator:main"
+euler = "src.euler_integrator:main"
+models = "src.models:main"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
