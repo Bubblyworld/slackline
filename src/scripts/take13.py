@@ -24,18 +24,6 @@ theta0 = 0.03 # rads (initial angle of webbing below horizontal)
 # calculus to an appropriate Lagrangian, something sympy can do for us.        #
 ################################################################################
 
-def lagrangian_approx_y(x, y, n, g, m, K):
-    """
-    A Lagrangian that uses the following second-order approximation:
-        sqrt(1 + y_x^2) ~ 1 + y_x^2/2
-    ...which is only valid in the regime y_x ~ 0.
-    """
-    y_x = y.diff(x)
-    n_x = n.diff(x)
-    gravity = m*g*y*n.diff(x)
-    tension = K/2*(1 + y_x**2)/n_x - K/2*y_x**2 + K/2*n_x
-    return gravity + tension
-
 def lagrangian(x, y, n, g, m, K):
     """
     A Lagrangian with no approximations.
@@ -45,6 +33,16 @@ def lagrangian(x, y, n, g, m, K):
     gravity = m*g*y*n.diff(x)
     tension = K/2*(1 + y_x**2)/n_x - K*sp.sqrt(1 + y_x**2) + K/2*n_x
     return gravity + tension
+
+def lagrangian_approx_1(x, y, n, g, m, K):
+    """
+    A Lagrangian that uses the following second-order approximation:
+        sqrt(1 + y_x^2) ~ 1 + y_x^2/2
+    ...which is only valid in the regime y_x ~ 0.
+    """
+    return lagrangian(x, y, n, g, m, K).subs({
+        sp.sqrt(1 + y.diff(x)**2): 1 + y.diff(x)**2/2,
+    })
 
 ################################################################################
 # To integrate y(x) and n(x) numerically, we use the Euler-Lagrange equations. #
@@ -61,6 +59,7 @@ def integrate(lagrangian):
     _g = sp.Symbol("g")
     _K = sp.Symbol("K")
     _L = lagrangian(_x, _y, _n, _g, _m, _K)
+    sp.pprint(_L)
 
     # The Euler-Lagrange equations can be computed using sympy:
     els = sp.calculus.euler.euler_equations(_L, [_y, _n], [_x])
@@ -102,7 +101,7 @@ def integrate(lagrangian):
     print()
 
     # Actually integrate the model:
-    print("INTEGRATING FOR MAX 10000 STEPS:")
+    print("INTEGRATING UNTIL y(x) = 0 AGAIN:")
     i=0
     while y[-1] <= 0: # don't run forever
         # We can get y_xx and n_xx from the Euler-Lagrange equations:
@@ -126,6 +125,13 @@ def integrate(lagrangian):
         x = np.append(x, x[i] + dx)
         i += 1
 
+        # Spit something out so we know it's still working:
+        if i % 1000 == 0:
+            print("step {:5d}: x = {:10.5f}, y = {:10.5f}, n = {:10.5f}".format(
+                i, x[i], y[i], n[i]))
+    print("Integration complete after {} steps.".format(i))
+    print("DONE.")
+
     # Compute arclength and tension:
     l = np.cumsum(np.sqrt(1 + y_x**2))*dx
     T = K*(np.sqrt(1 + y_x**2) / n_x - 1)
@@ -134,24 +140,14 @@ def integrate(lagrangian):
     return x, y, n, y_x, n_x, l, T
 
 def main():
-    # Integrate the model:
-    x, y, n, y_x, n_x, l, T = integrate(lagrangian_approx_y)
+    x1, y1, n1, y_x1, n_x1, l1, T1 = integrate(lagrangian)
+    x2, y2, n2, y_x2, n_x2, l2, T2 = integrate(lagrangian_approx_1)
 
-    # We want to plot 3 things side by side, making sure they fit:
-    #   1) y vs x, the webbing curve
-    #   2) y_ vs x, to see if/where we violate the assumption y_x ~ 0
-    #   3) T vs x, to see how the tension varies
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4))
-    ax1.plot(x, y)
-    ax1.set_title("Curve")
-    ax1.set_xlabel("$x$")
-    ax1.set_ylabel("$y$")
-    ax2.plot(x, y_x)
-    ax2.set_title("Slope")
-    ax2.set_xlabel("$x$")
-    ax2.set_ylabel("$\\frac{dy}{dx}$")
-    ax3.plot(x, T)
-    ax3.set_title("Tension")
-    ax3.set_xlabel("$x$")
-    ax3.set_ylabel("$T$")
+    # Plot y(x) for all Lagrangians:
+    plt.figure()
+    plt.plot(x1, y1, label="Lagrangian")
+    plt.plot(x2, y2, label="Lagrangian (approx 1)")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.legend()
     plt.show()
