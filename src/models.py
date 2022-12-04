@@ -26,6 +26,13 @@ def lagrangian_approx_1(x, y, n, m, g, K):
         sp.sqrt(1 + y.diff(x)**2): 1 + y.diff(x)**2/2,
     })
 
+def lagrangian_dd(x, y, n, m, g, K):
+    """
+    A Lagrangian that includes a dirac-delta term at n=0 for a mass of weight
+    W. This is used to simulate the mass of the webbing itself.
+    """
+    return lagrangian_approx_1(x, y, n, m, g, K) + m*sp.DiracDelta(n)*y
+
 ###############################################################################
 # Run the script.                                                             #
 ###############################################################################
@@ -44,7 +51,7 @@ def main():
     y = sp.Function('y')(x)
     n = sp.Function('n')(x)
     m = sp.Function('m')(n)
-    L = lagrangian_approx_1(x, y, n, m, g, K)
+    L = lagrangian_dd(x, y, n, m, g, K)
 
     # Pretty print the Lagrangian:
     print("LAGRANGIAN:")

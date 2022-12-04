@@ -8,14 +8,14 @@ from findiff import FinDiff
 sp.init_printing()
 
 # Constants:
-dx = 0.1 # m (step size)
+dx = 0.5 # m (step size)
 g = 9.81 # m / s^2 (gravitational acceleration)
 K = 2500*100.0 # N (newtons per 100% stretch in rope)
 m = 0.044 # kg / m (mass density of rope in natural units)
 
 # Initial conditions:
-X = 100.0 # m (gap length)
-T0 = 1000.0 # N (initial tension in rope)
+X = 1000.0 # m (gap length)
+T0 = 1000 # N (initial tension in rope)
 theta0 = 0.03 # rads (initial angle of webbing below horizontal)
 
 ################################################################################

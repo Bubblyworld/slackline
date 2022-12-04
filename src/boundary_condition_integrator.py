@@ -11,11 +11,8 @@ sp.init_printing()
 dx = 0.1 # m (step size)
 g = 9.81 # m / s^2 (gravitational acceleration)
 K = 2500*100.0 # N (newtons per 100% stretch in rope)
-m = 0.044 # kg / m (mass density of rope in natural units)
-
-# Constants for the boundary-value problem:
-X = 100.0 # m (gap length)
-N = 99.0 # m (natural length)
+M = 0.044 # kg / m (mass density of rope in natural units)
+W = 80.0 # kg (weight of slackliner in centre)
 
 ################################################################################
 # The two functions we are trying to find are y(x) and n(x), which are the     #
@@ -51,7 +48,7 @@ def lagrangian_approx_1(x, y, n, g, m, K):
 # order ODEs by defining a = dy/dx and b = dn/dx.                              #
 ################################################################################
 
-def integrate(lagrangian):
+def integrate(lagrangian, X=100.0, N=99.0, M=0.044, W=80.0):
     # Initialise the symbol variables and functions:
     _x = sp.Symbol("x")
     _y = sp.Function("y")(_x)
@@ -80,21 +77,6 @@ def integrate(lagrangian):
     eq_y = _a
     eq_n = _b
 
-    # Spit out the system of first-order ODEs:
-    print("SYSTEM OF FIRST-ORDER ODEs:")
-    print("dy/dx =")
-    sp.pprint(eq_y)
-    print()
-    print("dn/dx =")
-    sp.pprint(eq_n)
-    print()
-    print("da/dx =")
-    sp.pprint(eq_a)
-    print()
-    print("db/dx =")
-    sp.pprint(eq_b)
-    print()
-
     # Lambdify the equations so we can use them in a numpy integrator:
     fn_y = sp.lambdify((_x, _y, _n, _a, _b, _m, _g, _K), eq_y, "numpy")
     fn_n = sp.lambdify((_x, _y, _n, _a, _b, _m, _g, _K), eq_n, "numpy")
@@ -108,19 +90,25 @@ def integrate(lagrangian):
 
     # Our initial guesses for the solution are y(x) = 0, n(x) = N*x/X,
     # a(x) = 0, and b(x) = N/X:
-    x = np.arange(0, X, 0.1)
+    x = np.arange(0, X, dx)
     guesses = np.zeros((4, x.size))
     guesses[1] = N*x/X
     guesses[3] = N/X * np.ones(x.size)
+
+    # The mass element of the webbing, m, is a function of n. It is given by
+    # the sum of a constant M, and a gaussian distribution centered at N/2
+    # with a standard deviation of 1m, multiplied by W:
+    def m(n):
+        return M + W * scipy.stats.norm.pdf(n, N/2, 0.5)
 
     # Use scipy.integrate.solve_bvp to solve this boundary-value problem:
     print("SOLVING...")
     def fn(x, y):
         return np.array([
-            fn_y(x, y[0], y[1], y[2], y[3], m, g, K),
-            fn_n(x, y[0], y[1], y[2], y[3], m, g, K),
-            fn_a(x, y[0], y[1], y[2], y[3], m, g, K),
-            fn_b(x, y[0], y[1], y[2], y[3], m, g, K),
+            fn_y(x, y[0], y[1], y[2], y[3], m(y[1]), g, K),
+            fn_n(x, y[0], y[1], y[2], y[3], m(y[1]), g, K),
+            fn_a(x, y[0], y[1], y[2], y[3], m(y[1]), g, K),
+            fn_b(x, y[0], y[1], y[2], y[3], m(y[1]), g, K),
         ])
     sol = scipy.integrate.solve_bvp(fn, bc, x, guesses)
     print("...and we're done.")
@@ -138,11 +126,20 @@ def integrate(lagrangian):
     return x, y, n, y_x, n_x, l, T
 
 def main():
-    x, y, n, y_x, n_x, l, T = integrate(lagrangian)
-
-    # Plot y against x for each integration with an appropriate label:
-    plt.plot(x, y)
-    plt.xlabel("x")
-    plt.ylabel("y")
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    for N in [992.0]:
+        x, y, n, y_x, n_x, l, T = integrate(lagrangian, X=1000.0, N=N, W=0.0)
+        anchor_T = (T[0] + T[-1])/2
+        x, y, n, y_x, n_x, l, T = integrate(lagrangian, X=1000.0, N=N, W=W)
+        axes[0].plot(x, y)
+        axes[1].plot(x, T, label="standing {:.2f}kN".format(anchor_T/1000))
+    axes[0].set_xlabel("x (m)")
+    axes[0].set_ylabel("y (m)")
+    axes[0].set_title("Curve")
+    axes[1].set_xlabel("x (m)")
+    axes[1].set_ylabel("T (N)")
+    axes[1].set_title("Tension")
+    axes[1].legend()
+    plt.tight_layout()
     plt.show()
 
