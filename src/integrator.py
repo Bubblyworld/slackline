@@ -1,6 +1,6 @@
 import numpy as np
 import scipy as sp
-from .calculus import first_order_euler_lagrange
+from .calculus import first_order_euler_lagrange, mass_boundary_conditions
 from matplotlib import pyplot as plt
 
 
@@ -73,6 +73,10 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
                 t_eval=_x,
             )
 
+            # TODO: currently we don't handle the mass case properly, we need to
+            # trim the solution before we're donewith the masses if it crosses
+            # the axis again.
+
             # Path for the last segment:
             if i == len(masses):
                 # If we haven't reached the right anchor point, we need to
@@ -88,6 +92,14 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
                 n = np.append(n, sol.y[1][:j])
                 y_x = np.append(y_x, sol.y[2][:j])
                 n_x = np.append(n_x, sol.y[3][:j])
+
+                # Add the right anchor point using a linear interpolation:
+                dx = -y[-1] / y_x[-1]
+                x = np.append(x, x[-1] + dx)
+                y = np.append(y, 0.0)
+                n = np.append(n, n[-1] + dx * n_x[-1])
+                y_x = np.append(y_x, y_x[-1])
+                n_x = np.append(n_x, n_x[-1])
                 break
 
             # Path for an initial segment:
@@ -98,11 +110,11 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
             n_x = np.append(n_x, sol.y[3])
             last_x = x[-1]
 
-            # TODO: update the initial conditions based on dirac delta stuff
-            y0 = y[-1]
-            n0 = n[-1]
-            y_x0 = y_x[-1]
-            n_x0 = n_x[-1]
+            # Update the boundary conditions for the next segment:
+            y0, n0, y_x0, n_x0 = mass_boundary_conditions(
+                lagrangian, last_x, y[-1], n[-1], y_x[-1], n_x[-1],
+                slackline.m, slackline.g, slackline.K, masses[i][1],
+            )
             break
 
     # ...and we're done here:
