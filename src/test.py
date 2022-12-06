@@ -15,7 +15,7 @@ def main():
                 dyneemite_pro,
                 T0,
                 theta0,
-                masses=[(50.0, 70.0)],
+                masses=[(0, 10), (5.0, 70.0), (15.0, 80.0), (100, 90.0), (2300, 80.0)],
                 length_cutoff=100000.0,
             )
             plt.plot(x, y, label=f"T0={T0}, theta0={theta0}")

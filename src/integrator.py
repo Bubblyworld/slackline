@@ -24,6 +24,12 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
         masses: A list of (x, m) tuples, where x is the position of the mass, and m is the mass. Defaults to the empty list.
         length_cutoff: The maximum length of the slackline. Defaults to 10000m.
     """
+    # Remove any masses at the left anchor and warn the user:
+    for x, m in masses:
+        if x == 0:
+            print(f"Warning: removing mass of {m}kg at x=0, as this is the left anchor point.")
+    masses = [m for m in masses if m[0] > 0.0]
+
     # The system of four ODEs we need to integrate:
     fn_y, fn_n, fn_y_x, fn_n_x = first_order_euler_lagrange(lagrangian)
     def fn(x, y):
@@ -73,19 +79,9 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
                 t_eval=_x,
             )
 
-            # TODO: currently we don't handle the mass case properly, we need to
-            # trim the solution before we're donewith the masses if it crosses
-            # the axis again.
-
-            # Path for the last segment:
-            if i == len(masses):
-                # If we haven't reached the right anchor point, we need to
-                # increase the length of the segment:
-                if sol.y[0][-1] < 0.0:
-                    L *= 2
-                    continue
-
-                # Otherwise we need to trim the solution to the right anchor:
+            # If we've reached the right anchor (y > 0), then we need to trim 
+            # the solution and return early:
+            if sol.y[0][-1] >= 0.0:
                 j = np.argmax(sol.y[0] > 0.0)
                 x = np.append(x, sol.t[:j])
                 y = np.append(y, sol.y[0][:j])
@@ -100,17 +96,26 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
                 n = np.append(n, n[-1] + dx * n_x[-1])
                 y_x = np.append(y_x, y_x[-1])
                 n_x = np.append(n_x, n_x[-1])
-                break
 
-            # Path for an initial segment:
+                # If there are outstanding masses, warn the user:
+                if i < len(masses):
+                    print(f"Warning: {len(masses) - i} masses were ignored as they lie beyond the right anchor point.")
+                return x, y, n, y_x, n_x
+
+            # If we haven't reached the right anchor point for the last segment,
+            # then we need to increase the length of the segment and try again:
+            if i == len(masses):
+                L *= 2
+                continue
+
+            # Otherwise, we need to apply the boundary condition at the mass
+            # and continue integrating the next segment:
             x = np.append(x, sol.t)
             y = np.append(y, sol.y[0])
             n = np.append(n, sol.y[1])
             y_x = np.append(y_x, sol.y[2])
             n_x = np.append(n_x, sol.y[3])
             last_x = x[-1]
-
-            # Update the boundary conditions for the next segment:
             y0, n0, y_x0, n_x0 = mass_boundary_conditions(
                 lagrangian, last_x, y[-1], n[-1], y_x[-1], n_x[-1],
                 slackline.m, slackline.g, slackline.K, masses[i][1],
