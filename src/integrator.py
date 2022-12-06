@@ -9,7 +9,7 @@ class SlacklineTooLongError(Exception):
     pass
 
 
-def integrate(lagrangian, slackline, anchor_tension, anchor_angle, 
+def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
               masses=[], length_cutoff=10000.0):
     """
     Integrates the curve of a rigged slackline with given anchor tension, and
@@ -24,6 +24,8 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
         masses: A list of (x, m) tuples, where x is the position of the mass, and m is the mass. Defaults to the empty list.
         length_cutoff: The maximum length of the slackline. Defaults to 10000m.
     """
+    print(f"Integrating with anchor tension {anchor_tension} and anchor angle {anchor_angle}.")
+
     # Remove any masses at the left anchor and warn the user:
     for x, m in masses:
         if x == 0:
@@ -68,14 +70,14 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
         # segment of webbing, which we don't know up front:
         while True:
             if L + last_x > length_cutoff:
-                raise SlacklineTooLongError("The slackline is too long to integrate.")
+                L = length_cutoff - last_x
 
             _x = np.linspace(last_x, last_x + L, 1000)
             sol = sp.integrate.solve_ivp(
                 fn,
                 (last_x, last_x + L),
                 (y0, n0, y_x0, n_x0),
-                method="BDF",
+                method="RK45",
                 t_eval=_x,
             )
 
@@ -100,11 +102,16 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
                 # If there are outstanding masses, warn the user:
                 if i < len(masses):
                     print(f"Warning: {len(masses) - i} masses were ignored as they lie beyond the right anchor point.")
+
+                print(f"Integration complete. Final length: {x[-1]}m.")
                 return x, y, n, y_x, n_x
 
             # If we haven't reached the right anchor point for the last segment,
             # then we need to increase the length of the segment and try again:
             if i == len(masses):
+                if L + last_x >= length_cutoff:
+                    print(f"Warning: slackline is too long. Stopping at: {L + last_x}m.")
+                    raise SlacklineTooLongError(f"Slackline is too long. Maximum length is {length_cutoff}m.")
                 L *= 2
                 continue
 
@@ -122,5 +129,40 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
             )
             break
 
-    # ...and we're done here:
+    print(f"Integration complete. Final length: {x[-1]}m.")
     return x, y, n, y_x, n_x
+
+
+def integrate_length_tension(lagrangian, slackline, length, anchor_tension):
+    """
+    Integrator that solves for a slackline of a given length and standing
+    anchor tension by binary searching the core integrator. Doesn't support
+    adding slackliners, as the intended use is to "rig" the slackline using
+    this integrator with nobody on it, and then use the parameters obtained
+    in the natural length integrator to obtain the solution for slackliners
+    on the line.
+
+    Inputs:
+        lagrangian: The Lagrangian of the system.
+        slackline: A Slackline object.
+        length: The length of the slackline.
+        anchor_tension: The tension in the standing anchor.
+    """
+    a = 0.001 # lower bound
+    b = np.pi / 8 # upper bound
+    while True:
+        anchor_angle = (a + b) / 2
+        try:
+            x, y, n, y_x, n_x = integrate(
+                lagrangian, slackline, anchor_tension, anchor_angle,
+                length_cutoff=length*2,
+            )
+        except SlacklineTooLongError:
+            b = anchor_angle
+            continue
+        if np.abs(x[-1] - length) < 1e-1: # don't have to be too precise
+            return x, y, n, y_x, n_x
+        elif x[-1] > length:
+            b = anchor_angle
+        else:
+            a = anchor_angle
