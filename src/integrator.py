@@ -10,7 +10,7 @@ class SlacklineTooLongError(Exception):
 
 
 def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
-              masses=[], length_cutoff=10000.0):
+              masses=[], length_cutoff=10000.0, foel=None):
     """
     Integrates the curve of a rigged slackline with given anchor tension, and
     angle. This can be binary searched to do more interesting things, like
@@ -23,6 +23,7 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
         anchor_angle: The angle below horizontal of the webbing at the left anchor point.
         masses: A list of (x, m) tuples, where x is the position of the mass, and m is the mass. Defaults to the empty list.
         length_cutoff: The maximum length of the slackline. Defaults to 10000m.
+        foel: Optional cache of the first-order Euler-Lagrange equations, for efficiency.
     """
     print(f"Integrating with anchor tension {anchor_tension} and anchor angle {anchor_angle}.")
 
@@ -33,7 +34,10 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
     masses = [m for m in masses if m[0] > 0.0]
 
     # The system of four ODEs we need to integrate:
-    fn_y, fn_n, fn_y_x, fn_n_x = first_order_euler_lagrange(lagrangian)
+    if foel is not None:
+        fn_y, fn_n, fn_y_x, fn_n_x = foel
+    else:
+        fn_y, fn_n, fn_y_x, fn_n_x = first_order_euler_lagrange(lagrangian)
     def fn(x, y):
         return np.array([
             fn_y(x, y[0], y[1], y[2], y[3], slackline.m, slackline.g, slackline.K),
@@ -133,36 +137,38 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
     return x, y, n, y_x, n_x
 
 
-def integrate_length_tension(lagrangian, slackline, length, anchor_tension):
+def integrate_length_tension(lagrangian, slackline, gap_length, anchor_tension, masses=[]):
     """
-    Integrator that solves for a slackline of a given length and standing
-    anchor tension by binary searching the core integrator. Doesn't support
-    adding slackliners, as the intended use is to "rig" the slackline using
-    this integrator with nobody on it, and then use the parameters obtained
-    in the natural length integrator to obtain the solution for slackliners
-    on the line.
-
-    Inputs:
-        lagrangian: The Lagrangian of the system.
-        slackline: A Slackline object.
-        length: The length of the slackline.
-        anchor_tension: The tension in the standing anchor.
+    Integrator that solves for a slackline of a given gap length and standing
+    anchor tension by binary searching the core integrator.
     """
     a = 0.001 # lower bound
     b = np.pi / 8 # upper bound
+    foel = first_order_euler_lagrange(lagrangian) # cache for efficiency
     while True:
         anchor_angle = (a + b) / 2
         try:
             x, y, n, y_x, n_x = integrate(
                 lagrangian, slackline, anchor_tension, anchor_angle,
-                length_cutoff=length*2,
+                masses=masses,
+                length_cutoff=gap_length,
+                foel=foel,
             )
         except SlacklineTooLongError:
             b = anchor_angle
             continue
-        if np.abs(x[-1] - length) < 1e-1: # don't have to be too precise
+        if np.abs(x[-1] - gap_length) < 1e-1: # don't have to be too precise
             return x, y, n, y_x, n_x
-        elif x[-1] > length:
+        elif x[-1] > gap_length:
             b = anchor_angle
         else:
             a = anchor_angle
+
+def integrate_natural_length(lagrangian, slackline, gap_length, natural_length, masses=[]):
+    """
+    Integrator that solves for a slackline of a given gap length and natural
+    (i.e. untensioned) slackline length. These parameters can be obtained from
+    the length_tension integrator, and then used to solve for the solution
+    with slackliners on the line.
+    """
+    pass
