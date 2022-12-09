@@ -26,6 +26,8 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
         foel: Optional cache of the first-order Euler-Lagrange equations, for efficiency.
     """
     print(f"Integrating with anchor tension {anchor_tension} and anchor angle {anchor_angle}.")
+    if foel is None:
+        foel = first_order_euler_lagrange(lagrangian)
 
     # Remove any masses at the left anchor and warn the user:
     for x, m in masses:
@@ -34,10 +36,7 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
     masses = [m for m in masses if m[0] > 0.0]
 
     # The system of four ODEs we need to integrate:
-    if foel is not None:
-        fn_y, fn_n, fn_y_x, fn_n_x = foel
-    else:
-        fn_y, fn_n, fn_y_x, fn_n_x = first_order_euler_lagrange(lagrangian)
+    fn_y, fn_n, fn_y_x, fn_n_x = foel
     def fn(x, y):
         return np.array([
             fn_y(x, y[0], y[1], y[2], y[3], slackline.m, slackline.g, slackline.K),
@@ -68,7 +67,7 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
         if i == len(masses):
             L = 1000.0
         else:
-            L = masses[i][0]
+            L = masses[i][0] - last_x
 
         # We use a loop because we need to search for the length of the last
         # segment of webbing, which we don't know up front:
@@ -127,6 +126,7 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
             y_x = np.append(y_x, sol.y[2])
             n_x = np.append(n_x, sol.y[3])
             last_x = x[-1]
+            print(f"last_y: {y[-1]}")
             y0, n0, y_x0, n_x0 = mass_boundary_conditions(
                 lagrangian, last_x, y[-1], n[-1], y_x[-1], n_x[-1],
                 slackline.m, slackline.g, slackline.K, masses[i][1],
@@ -137,14 +137,18 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
     return x, y, n, y_x, n_x
 
 
-def integrate_length_tension(lagrangian, slackline, gap_length, anchor_tension, masses=[]):
+def integrate_length_tension(lagrangian, slackline, gap_length, anchor_tension,
+                             masses=[], foel=None):
     """
     Integrator that solves for a slackline of a given gap length and standing
     anchor tension by binary searching the core integrator.
     """
+    print(f"Integrating for gap length: {gap_length}m, anchor tension: {anchor_tension}N.")
+    if foel is None:
+        foel = first_order_euler_lagrange(lagrangian)
+
     a = 0.001 # lower bound
-    b = np.pi / 8 # upper bound
-    foel = first_order_euler_lagrange(lagrangian) # cache for efficiency
+    b = np.pi / 4 # upper bound
     while True:
         anchor_angle = (a + b) / 2
         try:
@@ -164,11 +168,31 @@ def integrate_length_tension(lagrangian, slackline, gap_length, anchor_tension, 
         else:
             a = anchor_angle
 
-def integrate_natural_length(lagrangian, slackline, gap_length, natural_length, masses=[]):
+def integrate_natural_length(lagrangian, slackline, gap_length, natural_length,
+                             masses=[], foel=None):
     """
     Integrator that solves for a slackline of a given gap length and natural
     (i.e. untensioned) slackline length. These parameters can be obtained from
-    the length_tension integrator, and then used to solve for the solution
-    with slackliners on the line.
+    the length_tension integrator, and then used to solve for tension once the
+    slackliners have been positioned.
     """
-    pass
+    print(f"Integrating for natural length: {natural_length}m, gap length: {gap_length}m.")
+    if foel is None:
+        foel = first_order_euler_lagrange(lagrangian)
+
+    # We can binary search on the anchor tension:
+    a = natural_length * slackline.m * slackline.g # lower bound
+    b = 50000.0 # upper bound
+    while True:
+        anchor_tension = (a + b) / 2
+        x, y, n, y_x, n_x = integrate_length_tension(
+            lagrangian, slackline, gap_length, anchor_tension,
+            masses=masses,
+            foel=foel,
+        )
+        if np.abs(n[-1] - natural_length) < 1e-1: # don't have to be too precise
+            return x, y, n, y_x, n_x, anchor_tension
+        elif n[-1] > natural_length:
+            a = anchor_tension
+        else:
+            b = anchor_tension

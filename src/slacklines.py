@@ -7,4 +7,4 @@ from collections import namedtuple
 Slackline = namedtuple("Slackline", ["m", "g", "K"])
 
 # Leighton provided the following specs:
-dyneemite_pro = Slackline(m=0.044, g=9.81, K=2500*100.0)
+dyneemite_pro = Slackline(m=0.088, g=9.81, K=2500*100.0)
