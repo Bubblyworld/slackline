@@ -2,7 +2,7 @@ import sympy as sp
 
 def ideal(x, y, n, m, g, K):
     """
-    A Lagrangian for an ideal elastic webbing with the following parameters:
+    A lagrangian for an ideal elastic webbing with the following parameters:
       x: horizontal distance along the gap
       y(x): vertical drop of webbing
       n(x): unstretched length of the webbing up to point x
@@ -18,7 +18,7 @@ def ideal(x, y, n, m, g, K):
 
 def first_approximation(x, y, n, m, g, K):
     """
-    An apprimation of the ideal Lagrangian that makes the following assumptions:
+    An approximation of the ideal lagrangian that makes the following assumption:
         1. sqrt(1 + y_x^2) = 1 + y_x^2/2
     """
     return ideal(x, y, n, m, g, K).subs({

@@ -1,4 +1,6 @@
+import scipy.optimize as so
 import sympy as sp
+import numpy as np
 
 def first_order_euler_lagrange(lagrangian):
     """
@@ -42,7 +44,7 @@ def first_order_euler_lagrange(lagrangian):
 
     return [fn_y, fn_n, fn_a, fn_b]
 
-def mass_boundary_conditions(lagrangian, x, y, n, y_x, n_x, m, g, K, mass):
+def mass_boundary_conditions(lagrangian, _x, _m, _g, _K, _M):
     """
     Given the final values of the system at a point mass on its left-hand
     segment of webbing, this function returns the initial conditions of the
@@ -54,51 +56,51 @@ def mass_boundary_conditions(lagrangian, x, y, n, y_x, n_x, m, g, K, mass):
     discontinuities at point masses, and handling them by simply changing the
     mass of the slackline introduces numerical issues with the integrator.
     """
-    # We assume continuity of x, y(x) and n(x), so the initial values for
-    # these variables is simply the final values of the previous segment:
-    y0 = y
-    n0 = n
+    x = sp.Symbol("x")
+    y = sp.Function("y")(x)
+    n = sp.Function("n")(x)
+    a_l = sp.Symbol("a_l") # dy/dx on LHS of mass
+    b_l = sp.Symbol("b_l") # dn/dx on LHS of mass
+    a_r = sp.Symbol("a_r") # dy/dx on RHS of mass
+    b_r = sp.Symbol("b_r") # dn/dx the RHS of mass
+    m = sp.Symbol("m")
+    g = sp.Symbol("g")
+    K = sp.Symbol("K")
+    M = sp.Symbol("M") # mass of the slackliner
 
-    # To compute the initial values of y_x and n_x, we can solve the following
-    # two equations obtained by integrating a delta potential over [x-e, x+e]:
-    #    dL/dy_x(right) - dL/dy_x(left) = m*g
-    #    dL/dn_x(right) - dL/dn_x(left) = 0
-    # where L is the Lagrangian of the system.
-    _x = sp.Symbol("x")
-    _y = sp.Function("y")(_x)
-    _n = sp.Function("n")(_x)
-    _m = sp.Symbol("m")
-    _g = sp.Symbol("g")
-    _K = sp.Symbol("K")
-    _y_x = _y.diff(_x)
-    _n_x = _n.diff(_x)
-    L = lagrangian(_x, _y, _n, _m, _g, _K)
-    dL_dy_x = sp.diff(L, _y_x)
-    dL_dn_x = sp.diff(L, _n_x)
+    # First we get dL/da and dL/db:
+    L = lagrangian(x, y, n, m, g, K)
+    dL_da = sp.diff(L, y.diff(x))
+    dL_db = sp.diff(L, n.diff(x))
 
-    # Sympy has issues with substitutions, so we introduce new symbols for y_x, n_x:
-    a = sp.Symbol("a")
-    b = sp.Symbol("b")
-    dL_dy_x = dL_dy_x.subs({_y_x: a, _n_x: b})
-    dL_dn_x = dL_dn_x.subs({_y_x: a, _n_x: b})
+    # Then we make the substitutions for a_l, b_l, a_r, b_r:
+    dL_da_l = dL_da.subs({y.diff(x): a_l, n.diff(x): b_l})
+    dL_db_l = dL_db.subs({y.diff(x): a_l, n.diff(x): b_l})
+    dL_da_r = dL_da.subs({y.diff(x): a_r, n.diff(x): b_r})
+    dL_db_r = dL_db.subs({y.diff(x): a_r, n.diff(x): b_r})
 
-    # For the left-side values, we substitute the known variables:
-    dL_dy_x_left = dL_dy_x.subs({_x: x, _y: y, _n: n, _m: m, _g: g, _K: K, a: y_x, b: n_x})
-    dL_dn_x_left = dL_dn_x.subs({_x: x, _y: y, _n: n, _m: m, _g: g, _K: K, a: y_x, b: n_x})
+    # We want to solve the following equations for a_r, b_r:
+    eq1 = dL_da_r - dL_da_l - _M*_g
+    eq2 = dL_db_r - dL_db_l
 
-    # For the right-side values, we substitute everything but a, b:
-    dL_dy_x_right = dL_dy_x.subs({_x: x, _y: y, _n: n, _m: m, _g: g, _K: K})
-    dL_dn_x_right = dL_dn_x.subs({_x: x, _y: y, _n: n, _m: m, _g: g, _K: K})
+    # Substituting for x here might be an issue if y(x), n(x) are around:
+    eq1 = eq1.subs({x: _x, m: _m, g: _g, K: _K, M: _M})
+    eq2 = eq2.subs({x: _x, m: _m, g: _g, K: _K, M: _M})
 
-    # Construct and solve the two equations:
-    eq1 = sp.Eq(dL_dy_x_right - dL_dy_x_left, mass*g)
-    eq2 = sp.Eq(dL_dn_x_right - dL_dn_x_left, 0)
-    sol = sp.solve([dL_dy_x_right - dL_dy_x_left - mass*g, dL_dn_x_right - dL_dn_x_left], [a, b])
+    # Recast the equations in a form scipy root solvers expect:
+    _fn1 = sp.lambdify([a_l, b_l, a_r, b_r], eq1, "numpy")
+    _fn2 = sp.lambdify([a_l, b_l, a_r, b_r], eq2, "numpy")
+    fn = lambda a_l, b_l: lambda ab: (
+        _fn1(a_l, b_l, ab[0], ab[1]), _fn2(a_l, b_l, ab[0], ab[1])
+    )
 
-    # The true solutions must have a, b both real with b>0:
-    for (a, b) in sol:
-        if a.is_real and b.is_real and b > 0:
-            return [y0, n0, a, b]
+    # And we're done here:
+    return lambda y_x, n_x: _mass_boundary_conditions(fn, y_x, n_x)
 
-    # If no solution is found, raise an exception:
-    raise Exception("No solution found for initial conditions!")
+def _mass_boundary_conditions(fn, y_x, n_x):
+    fn = fn(y_x, n_x)
+    root = so.fsolve(fn, [y_x, n_x])
+    if np.isclose(fn(root), [0,0], atol=1e-3).all():
+        return root
+    else:
+        return None

@@ -8,9 +8,13 @@ from matplotlib import pyplot as plt
 class SlacklineTooLongError(Exception):
     pass
 
+# An error occured when calculating boundary conditions for a slackliner:
+class SlacklinerError(Exception):
+    pass
+
 
 def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
-              masses=[], length_cutoff=10000.0, foel=None):
+              masses=[], length_cutoff=10000.0, foel=None, mbcs=None):
     """
     Integrates the curve of a rigged slackline with given anchor tension, and
     angle. This can be binary searched to do more interesting things, like
@@ -28,6 +32,10 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
     print(f"Integrating with anchor tension {anchor_tension} and anchor angle {anchor_angle}.")
     if foel is None:
         foel = first_order_euler_lagrange(lagrangian)
+    if mbcs is None:
+        mbcs = [mass_boundary_conditions(lagrangian, x, slackline.m,
+                                         slackline.g, slackline.K, M)
+                for x, M in masses]
 
     # Remove any masses at the left anchor and warn the user:
     for x, m in masses:
@@ -126,11 +134,12 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
             y_x = np.append(y_x, sol.y[2])
             n_x = np.append(n_x, sol.y[3])
             last_x = x[-1]
-            print(f"last_y: {y[-1]}")
-            y0, n0, y_x0, n_x0 = mass_boundary_conditions(
-                lagrangian, last_x, y[-1], n[-1], y_x[-1], n_x[-1],
-                slackline.m, slackline.g, slackline.K, masses[i][1],
-            )
+            y0, n0 = y[-1], n[-1]
+            bc = mbcs[i](y_x[-1], n_x[-1])
+            if bc is None:
+                print(f"Warning: mass of {masses[i][1]}kg at x={masses[i][0]}m is too heavy, cannot solve the boundary conditions for given parameters.")
+                raise SlacklinerError(f"Mass of {masses[i][1]}kg at x={masses[i][0]}m is too heavy, cannot solve boundary conditions for given parameters.")
+            y_x0, n_0 = bc[0], bc[1]
             break
 
     print(f"Integration complete. Final length: {x[-1]}m.")
@@ -138,7 +147,7 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
 
 
 def integrate_length_tension(lagrangian, slackline, gap_length, anchor_tension,
-                             masses=[], foel=None):
+                             masses=[], foel=None, mbcs=None):
     """
     Integrator that solves for a slackline of a given gap length and standing
     anchor tension by binary searching the core integrator.
@@ -146,6 +155,10 @@ def integrate_length_tension(lagrangian, slackline, gap_length, anchor_tension,
     print(f"Integrating for gap length: {gap_length}m, anchor tension: {anchor_tension}N.")
     if foel is None:
         foel = first_order_euler_lagrange(lagrangian)
+    if mbcs is None:
+        mbcs = [mass_boundary_conditions(lagrangian, x, slackline.m,
+                                         slackline.g, slackline.K, M) 
+                for x, M in masses]
 
     a = 0.001 # lower bound
     b = np.pi / 4 # upper bound
@@ -157,6 +170,7 @@ def integrate_length_tension(lagrangian, slackline, gap_length, anchor_tension,
                 masses=masses,
                 length_cutoff=gap_length,
                 foel=foel,
+                mbcs=mbcs,
             )
         except SlacklineTooLongError:
             b = anchor_angle
@@ -169,7 +183,7 @@ def integrate_length_tension(lagrangian, slackline, gap_length, anchor_tension,
             a = anchor_angle
 
 def integrate_natural_length(lagrangian, slackline, gap_length, natural_length,
-                             masses=[], foel=None):
+                             masses=[], foel=None, mbcs=None):
     """
     Integrator that solves for a slackline of a given gap length and natural
     (i.e. untensioned) slackline length. These parameters can be obtained from
@@ -179,6 +193,10 @@ def integrate_natural_length(lagrangian, slackline, gap_length, natural_length,
     print(f"Integrating for natural length: {natural_length}m, gap length: {gap_length}m.")
     if foel is None:
         foel = first_order_euler_lagrange(lagrangian)
+    if mbcs is None:
+        mbcs = [mass_boundary_conditions(lagrangian, x, slackline.m,
+                                         slackline.g, slackline.K, M) 
+                for x, M in masses]
 
     # We can binary search on the anchor tension:
     a = natural_length * slackline.m * slackline.g # lower bound
@@ -189,9 +207,10 @@ def integrate_natural_length(lagrangian, slackline, gap_length, natural_length,
             lagrangian, slackline, gap_length, anchor_tension,
             masses=masses,
             foel=foel,
+            mbcs=mbcs,
         )
         if np.abs(n[-1] - natural_length) < 1e-1: # don't have to be too precise
-            return x, y, n, y_x, n_x, anchor_tension
+            return x, y, n, y_x, n_x
         elif n[-1] > natural_length:
             a = anchor_tension
         else:
