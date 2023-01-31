@@ -13,6 +13,7 @@ class SlacklinerError(Exception):
     pass
 
 
+# Core integrator function.
 def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
               masses=[], length_cutoff=10000.0, foel=None, mbcs=None):
     """
@@ -21,7 +22,7 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
     finding the curve for a slackline of a given gap length.
 
     Inputs:
-        lagrangian: A sympy expression for the Lagrangian of the system.
+        lagrangian: A sympy expression for the lagrangian of the system.
         slackline: A Slackline object that describes the webbing.
         anchor_tension: The tension in the webbing at the left anchor point.
         anchor_angle: The angle below horizontal of the webbing at the left anchor point.
@@ -139,7 +140,7 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
             if bc is None:
                 print(f"Warning: mass of {masses[i][1]}kg at x={masses[i][0]}m is too heavy, cannot solve the boundary conditions for given parameters.")
                 raise SlacklinerError(f"Mass of {masses[i][1]}kg at x={masses[i][0]}m is too heavy, cannot solve boundary conditions for given parameters.")
-            y_x0, n_0 = bc[0], bc[1]
+            y_x0, n_x0 = bc[0], bc[1]
             break
 
     print(f"Integration complete. Final length: {x[-1]}m.")
@@ -160,7 +161,7 @@ def integrate_length_tension(lagrangian, slackline, gap_length, anchor_tension,
                                          slackline.g, slackline.K, M) 
                 for x, M in masses]
 
-    a = 0.001 # lower bound
+    a = 1e-10 # lower bound
     b = np.pi / 4 # upper bound
     while True:
         anchor_angle = (a + b) / 2

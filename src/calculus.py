@@ -75,12 +75,12 @@ def mass_boundary_conditions(lagrangian, _x, _m, _g, _K, _M):
 
     # Then we make the substitutions for a_l, b_l, a_r, b_r:
     dL_da_l = dL_da.subs({y.diff(x): a_l, n.diff(x): b_l})
-    dL_db_l = dL_db.subs({y.diff(x): a_l, n.diff(x): b_l})
     dL_da_r = dL_da.subs({y.diff(x): a_r, n.diff(x): b_r})
+    dL_db_l = dL_db.subs({y.diff(x): a_l, n.diff(x): b_l})
     dL_db_r = dL_db.subs({y.diff(x): a_r, n.diff(x): b_r})
 
     # We want to solve the following equations for a_r, b_r:
-    eq1 = dL_da_r - dL_da_l - _M*_g
+    eq1 = dL_da_r - dL_da_l - M*g
     eq2 = dL_db_r - dL_db_l
 
     # Substituting for x here might be an issue if y(x), n(x) are around:
