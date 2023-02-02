@@ -91,6 +91,8 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
                 (y0, n0, y_x0, n_x0),
                 method="RK45",
                 t_eval=_x,
+                rtol=1e-6,
+                atol=1e-6,
             )
 
             # If we've reached the right anchor (y > 0), then we need to trim 
