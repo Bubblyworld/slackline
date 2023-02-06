@@ -6,9 +6,6 @@ authors = ["Guy Paterson-Jones <guy.paterson.jones@gmail.com>"]
 license = "MIT"
 packages = [{ include = "src" }]
 
-[tool.poetry.scripts]
-test = "src.test:main"
-
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
 scipy = "^1.9.3"
