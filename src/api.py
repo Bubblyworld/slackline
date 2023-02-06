@@ -10,13 +10,14 @@ change the length of the line. These modifiers are designed to minimise the
 amount of precomputation that happens in the background - use them to avoid
 unnecessary work.
 """
-from core.integrator import integrate, integrate_length_tension, integrate_natural_length
-from core.calculus import first_order_euler_lagrange, mass_boundary_conditions
-from core.slacklines import list_slacklines, dyneemite_pro
-from core.lagrangians import ideal
+from src.core.integrator import integrate, integrate_length_tension, integrate_natural_length
+from src.core.calculus import first_order_euler_lagrange, mass_boundary_conditions
+from src.core.slacklines import Slackline, list_slacklines, dyneemite_pro
+from src.core.lagrangians import ideal
 from collections import namedtuple
 import matplotlib.pyplot as plt
 import numpy as np
+from box import Box
 
 
 class Rig:
@@ -38,6 +39,34 @@ class Rig:
         self.y = y
         self.T = T
         self.A = A
+
+    def to_json(self):
+        """
+        Utility method that returns a JSON representation of the rig.
+        """
+        return Box({
+            "x": self.x.tolist(),
+            "n": self.n.tolist(),
+            "l": self.l.tolist(),
+            "y": self.y.tolist(),
+            "T": self.T.tolist(),
+            "A": self.A.tolist(),
+        }).to_json()
+
+    @classmethod
+    def from_json(cls, json):
+        """
+        Utility method that constructs a Rig object from a JSON representation.
+        """
+        box = Box.from_json(json)
+        return cls(
+            x=np.array(box.x),
+            n=np.array(box.n),
+            l=np.array(box.l),
+            y=np.array(box.y),
+            T=np.array(box.T),
+            A=np.array(box.A),
+        )
 
     def plot(self):
         """
@@ -164,3 +193,31 @@ class Constraints:
         A = np.abs(np.arctan(y_x)) * 180 / np.pi
 
         return Rig(x, n, l, y, T, A)
+
+    def to_json(self):
+        """
+        Utility method that returns a JSON representation of the Constraints
+        object.
+        """
+        return Box({
+            "slackline": self.slackline.to_box(),
+            "gap_length": self.gap_length,
+            "anchor_tension": self.anchor_tension,
+            "slackliners": self.slackliners,
+        }).to_json()
+
+    @classmethod
+    def from_json(cls, json):
+        """
+        Utility method that constructs a Constraints object from a JSON
+        representation.
+        """
+        box = Box.from_json(json)
+        constraints = cls(
+            slackline=Slackline.from_box(box.slackline),
+            gap_length=box.gap_length,
+            anchor_tension=box.anchor_tension,
+        )
+        for position, mass in box.slackliners:
+            constraints.add_slackliner(position, mass)
+        return constraints
