@@ -4,6 +4,11 @@ from .calculus import first_order_euler_lagrange, mass_boundary_conditions
 from matplotlib import pyplot as plt
 
 
+# Constants for tuning the integrator:
+_STEP_COUNT = 100 # number of steps in each leg of integration
+_TOLERANCE = 1e-6 # tolerance in the solver solutions
+
+
 # An out of bounds error for slacklines that are too long:
 class SlacklineTooLongError(Exception):
     pass
@@ -84,15 +89,15 @@ def integrate(lagrangian, slackline, anchor_tension, anchor_angle,
             if L + last_x > length_cutoff:
                 L = length_cutoff - last_x
 
-            _x = np.linspace(last_x, last_x + L, 1000)
+            _x = np.linspace(last_x, last_x + L, _STEP_COUNT)
             sol = sp.integrate.solve_ivp(
                 fn,
                 (last_x, last_x + L),
                 (y0, n0, y_x0, n_x0),
                 method="RK45",
                 t_eval=_x,
-                rtol=1e-6,
-                atol=1e-6,
+                rtol=_TOLERANCE,
+                atol=_TOLERANCE,
             )
 
             # If we've reached the right anchor (y > 0), then we need to trim 
