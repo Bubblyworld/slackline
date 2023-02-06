@@ -18,6 +18,7 @@ from collections import namedtuple
 import matplotlib.pyplot as plt
 import numpy as np
 from box import Box
+import json
 
 
 class Rig:
@@ -40,18 +41,24 @@ class Rig:
         self.T = T
         self.A = A
 
-    def to_json(self):
+    def to_dict(self):
         """
-        Utility method that returns a JSON representation of the rig.
+        Utility method that returns a dictionary representation of the rig.
         """
-        return Box({
+        return {
             "x": self.x.tolist(),
             "n": self.n.tolist(),
             "l": self.l.tolist(),
             "y": self.y.tolist(),
             "T": self.T.tolist(),
             "A": self.A.tolist(),
-        }).to_json()
+        }
+
+    def to_json(self):
+        """
+        Utility method that returns a JSON representation of the rig.
+        """
+        return json.dumps(self.to_dict())
 
     @classmethod
     def from_json(cls, json):
@@ -212,7 +219,9 @@ class Constraints:
         Utility method that constructs a Constraints object from a JSON
         representation.
         """
-        box = Box.from_json(json)
+        if type(json) == str:
+            json = json.loads(json)
+        box = Box(json)
         constraints = cls(
             slackline=Slackline.from_box(box.slackline),
             gap_length=box.gap_length,
