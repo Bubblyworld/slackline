@@ -44,17 +44,38 @@ curl -X POST http://localhost:5000/rig \
 
 ### 25m line with 80kg person at center
 
+```python
+c = Constraints(gap_length=25, anchor_tension=2000)
+c.add_slackliner(position=12.5, mass=80)
+rig = c.rig()
+```
+
 ![25m](plot1_25m.png)
 
 ### 100m line with two people (70kg at 30m, 80kg at 70m)
+
+```python
+c = Constraints(gap_length=100, anchor_tension=3000)
+c.add_slackliner(position=30, mass=70)
+c.add_slackliner(position=70, mass=80)
+rig = c.rig()
+```
 
 ![100m](plot2_100m.png)
 
 ### 500m line with 75kg person at 100m
 
+```python
+c = Constraints(gap_length=500, anchor_tension=8000)
+c.add_slackliner(position=100, mass=75)
+rig = c.rig()
+```
+
 ![500m](plot3_500m.png)
 
 ## How it works
+
+**Note:** This is a **static equilibrium** solver - it computes the steady-state shape of the slackline under fixed loads. Dynamics (oscillations, bouncing, wave propagation) are not modeled.
 
 ### The Physics
 
